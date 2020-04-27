@@ -25,92 +25,9 @@
  *
  ******************************************************************************/
 
-__global__ void convert_float2half_kernel(half* dst, float* src, size_t size) {
-
-    int totalThreads = gridDim.x * blockDim.x;
-    int blockStart = blockDim.x * blockIdx.x;
-
-    for (int i = blockStart + threadIdx.x; i < size; i += totalThreads) {
-        dst[i] = __float2half(src[i]);
-    }
-}
-
 bool isDevicePtr(const void* ptr) {
     cudaPointerAttributes attributes;
     cudaError_t result = cudaPointerGetAttributes(&attributes, ptr);
     return (result == cudaSuccess) && (attributes.memoryType == cudaMemoryTypeDevice);
 }
 
-
-void convert_float2half(half* dst, float* src, size_t size) {
-    float* tmp;
-
-    if (isDevicePtr(src)) {
-        tmp = src;
-    }
-    else {
-        gpuErrChk(cudaMallocHost(&tmp, size*sizeof(float)));
-        memcpy(tmp, src, size*sizeof(float));
-    }
-
-    dim3 block(256,1,1);
-    dim3 grid(256,1,1);
-
-    convert_float2half_kernel<<<grid,block>>>(dst, tmp, size);
-    gpuErrChk(cudaDeviceSynchronize());
-
-    if (!isDevicePtr(src)) gpuErrChk(cudaFreeHost(tmp));
-}
-
-
-void convert_float2half2_vectorized(half2* dst, float* src, int M, int K) {
-    float* tmp;
-
-    if (isDevicePtr(src)) {
-        tmp = src;
-    }
-    else {
-        gpuErrChk(cudaMallocHost(&tmp, M*K*sizeof(float)));
-        memcpy(tmp, src, M*K*sizeof(float));
-    }
-
-    dim3 block(32);
-    assert((M%block.x)==0);
-    dim3 grid(M/block.x);
-
-    vectorizeWeights<float><<<grid,block>>>(M,K,dst, tmp);
-    gpuErrChk(cudaDeviceSynchronize());
-
-    gpuErrChk(cudaDeviceSynchronize());
-    if (!isDevicePtr(src)) gpuErrChk(cudaFreeHost(tmp));
-}
-
-__global__ void convert_half2float_kernel(float* dst, half* src, size_t size) {
-
-    int offset = blockDim.x*blockIdx.x + threadIdx.x;
-
-    if (offset < size) 
-        dst[offset] = __half2float(src[offset]);
-}
-
-void convert_half2float(float* dst, half* dSrc, size_t size) {
-    float* tmp;
-
-    if (isDevicePtr(dst)) {
-        tmp = dst;
-    }
-    else {
-        gpuErrChk(cudaMallocHost(&tmp, size*sizeof(float)));
-    }
-
-    dim3 block(256,1,1);
-    dim3 grid((size + block.x - 1)/block.x, 1, 1);
-
-    convert_half2float_kernel<<<grid,block>>>(tmp, dSrc, size);
-    gpuErrChk(cudaDeviceSynchronize());
-
-    if (!isDevicePtr(dst)) {
-        memcpy(dst, tmp, size*sizeof(float));
-        gpuErrChk(cudaFreeHost(tmp));
-    }
-}

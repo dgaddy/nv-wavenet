@@ -33,24 +33,8 @@ __device__ __forceinline__ bool isNegativeZero(float a) {
     return ret;
 }
 
-__device__ __forceinline__ bool isNegativeZero(half a){
-    const __half_raw* a_raw_ptr = (reinterpret_cast<const __half_raw *>(&a) );
-    int ret;
-    asm volatile("{  set.eq.s32.b32 %0, %1, %2;}\n" : "=r"(ret) : "r"(0x0u + (*a_raw_ptr).x), "r"(0x00008000));
-    return ret;
-}
-
 __device__ __forceinline__ float validate(float a) {
     return isNegativeZero(a) ? 0.f : a;
-}
-
-__device__ __forceinline__ half validate(half a) {
-    return isNegativeZero(a) ? (half)0.f : a;
-}
-
-__device__ __forceinline__ void storeValidate(volatile half* y, int index, half val) {
-    half* y_nv = (half*)y;
-    y_nv[index] = validate(val);
 }
 
 __device__ __forceinline__ void storeValidate(volatile float* y, int index, float val) {

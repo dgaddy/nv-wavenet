@@ -28,13 +28,7 @@
 #include "matrix_math.cuh"
 #include "softmax.cuh"
 
-template <int M, int K>
-__device__ __inline__ void loadWeights(half2 weights_local[K/2], half2* weights_remote, int layer, int row, int lda=M) {
-    loadVectorizedWeights<M,K>(weights_local,weights_remote,layer,row,lda);
-}
-
 __device__ float toFloat(float f) { return f; }
-__device__ float toFloat(half f) { return __half2float(f); }
 
 template <typename T_weight, typename T_data, int R, int S, int BATCH_UNROLL>
 __device__ void nv_wavenet_singleBlock_skip(int row, int num_layers, int batch_offset, int batch_size, T_weight* Wskip, T_data* Bskip, T_data h_sh[BATCH_UNROLL][R], T_data skip_out_sh[BATCH_UNROLL][S], T_data* skip_out, bool dumpActivations) {

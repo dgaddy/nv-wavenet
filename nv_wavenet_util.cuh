@@ -57,17 +57,6 @@ int getOccupancy(int deviceId, size_t blockSize, void* func) {
 
 }
 
-__device__ __forceinline__ half loadVolatile(const volatile half* y, int index) {
-    const volatile __half_raw* chr = (reinterpret_cast<const volatile __half_raw *>(y) );
-    __half_raw hr;
-    hr.x = chr[index].x;
-    return half( hr );
-}
-__device__ __forceinline__ void storeVolatile(volatile half* y, int index, half val) {
-    half* y_nv = (half*)y;
-    y_nv[index] = val;
-}
-
 __device__ __forceinline__ float loadVolatile(const volatile float* y, int index) {
     return y[index];
 }
@@ -86,6 +75,5 @@ __forceinline__ __device__ float _tanh(float in) {
 }
 
 __device__ __forceinline__ float relu(float f) { return (f < 0.f) ? 0.f : f; }
-__device__ __forceinline__ half relu(half h) { half zero = 0.f; return (h < zero) ? zero : h; }
 
 #endif

@@ -40,43 +40,6 @@ __device__ __inline__ void loadWeights(float weights_local[K], float* weights_re
 
 }
 
-// weights_unvectorized is an MxK matrix of col-major half values
-// weights_vectorized is an MxK/2 matrix of half2 values, where each half2 contains adjacent entries of a single row but is otherwise still col-major 
-// Total number of threads should equal M
-
-static __device__ __forceinline__ half toHalf(float f) {
-    return f;
-}
-
-static __device__ __forceinline__ half toHalf(half f) {
-    return __float2half(f);
-}
-
-template <typename T>
-__global__ void vectorizeWeights(int M, int K,half2* weights_vectorized, T* weights_unvectorized) {
-    int row = blockIdx.x*blockDim.x + threadIdx.x;
-    for (int k=0; k<K; k+= 2) { 
-        half2 stage;
-        stage.x = toHalf(weights_unvectorized[M*k + row]);
-        stage.y = toHalf(weights_unvectorized[M*(k+1) + row]);
-        weights_vectorized[M*(k/2) + row] = stage;
-    }
-}
-
-template <int M, int K>
-__device__ __inline__ void loadVectorizedWeights(half2 weights_local[K/2], half2* weights_remote, int layer, int thread_id, int lda=M) {
-
-    //if (thread_id >= M) return;
-
-    int row = thread_id;
-
-#pragma unroll
-    for (int i=0; i<K/2; i++) {
-        weights_local[i] = weights_remote[lda*K/2*layer + lda*i + row];
-    }
-}
-
-
 template <int K, int K_UNROLL, int TILE_N>
 __device__ void GEMM(float weights[K], float activations[TILE_N][K], float accum[TILE_N]) {
 
@@ -114,46 +77,6 @@ __device__ void GEMM(float weights[K], float activations[TILE_N][K], float accum
         accum[n] = accum_unrolled[n][0];
     }
 
-}
-
-template <int K, int K_UNROLL, int TILE_N>
-__device__ void GEMM(half2 weights[K/2], half activations[TILE_N][K], half accum[TILE_N]) {
-
-    half2 accum2[TILE_N][K_UNROLL];
-
-#pragma unroll
-    for (int n=0; n<TILE_N; n++) {
-#pragma unroll
-        for (int u=0; u<K_UNROLL; u++) {
-            accum2[n][u].x = 0.f;
-            accum2[n][u].y = 0.f;
-        }
-    }
-
-#pragma unroll
-    for (int i=0; i<K/2; i+= K_UNROLL) {
-#pragma unroll
-        for (int n=0; n<TILE_N; n++) {
-#pragma unroll
-            for (int u=0; u<K_UNROLL; u++) {
-                half2* activations2 = (half2*)activations[n];
-                accum2[n][u] = __hfma2(weights[i+u], activations2[i+u], accum2[n][u]);        
-            }
-        }
-    }
-
-#pragma unroll
-    for (int n=0; n<TILE_N; n++) {
-#pragma unroll
-        for (int u=1; u<K_UNROLL; u++) {
-            accum2[n][0] = __hadd2(accum2[n][0], accum2[n][u]);
-        }
-    }
-
-#pragma unroll
-    for (int n=0; n<TILE_N; n++) {
-        accum[n] = accum2[n][0].x + accum2[n][0].y;
-    }
 }
 
 #endif
